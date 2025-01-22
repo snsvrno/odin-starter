@@ -1,0 +1,4 @@
+// things that will be ignored by the template engine
+
+.git
+readme.md

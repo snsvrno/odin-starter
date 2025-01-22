@@ -21,6 +21,12 @@ supported platforms:
 
 ## explainations
 
+### files
+
+- `commit-notes` is a scratch pad that i write things that i did / worked on that is automatically pulled onto my commit via a git-hook
+- `post.fish` is a script used by my template script, executes these commands on a new project
+- `scripts/builds.fish` contains all the varibles that define the various builds used in `build.fish`, that way you don't need to get lost in the build script but can just edit the params
+
 ### structure
 
 there are three main packages: `src (package game)`, `runner (package main)`, `shared (package shared)`. the idea is that all the game logic is platform

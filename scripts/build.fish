@@ -1,16 +1,12 @@
 #!/usr/bin/fish
 
+# edit the `builds.fish` to set the build options and paths
+
 # odin project build script
 function main
 	# checks that required things are available in path
 	check_exists odin; if test $status -eq 1; return 1; end
 	check_exists jq; if test $status -eq 1; return 1; end
-
-	# some variables that will be project specific
-	set -l SRC_PATH src
-	set -l OUT_PATH bin
-	set -l EXE_NAME game
-	set -l EXE_FULL_PATH ""
 
 	argparse \
 		'r/release' 'd/dev' 'l/lib' 'a/assets' \
@@ -18,6 +14,9 @@ function main
 		'x/run' \
 		'h/help' \
 		-- $argv
+
+	# used for the run arg, so we know what to run
+	set EXE_FULL_PATH ""
 
 	# man
 	if set -q _flag_help
@@ -30,51 +29,18 @@ function main
 		man_heading "other"
 		man_line "h/help" "this display"
 		man_line "x/run" "run the project after building"
-		man_line "b/bundled" "will build the project with embedded libraries instead of external linked"
 	end
 
-	#####################################
-	# setting up the build parameters and options
-
-	set -l build_options \
-		-json-errors
-
-	# things that must be set in order to get the hot reload working properly
-	set -l dev_only_options \
-		-define:RAYLIB_SHARED=true
-
-	# checks if we are 100% commited, or if there is some un tracked stuff
-	set -l git_status "*"; if test -z "$(git status --porcelain)"; set git_status ""; end
-	set -l build_vars \
-		-define:GAME_VERSION="$(git describe --abbrev=0)" \
-		-define:BUILD_ARTIFACT=\""$(git rev-parse --short HEAD)$git_status"\" \
-		-define:BUILD_TIME="$(date +%y-%j-%H%M)"
-
-	# tools and other build things
-	set -l tool_res "tools/res" "tools/res/run.fish" -src=res -target=src/res.odin -d
+	# loading the project specific configurations
+	set -l CURRENT_SCRIPT_PATH (cd (dirname (status -f)); and cd ..; and pwd)
+	source $CURRENT_SCRIPT_PATH/scripts/builds.fish
 
 	############################
 	if set -q _flag_release
 
-		# if we want a bundled release, we can only check this here
-		# because DEV needs things to be separated in order to do 
-		# the hot reloading
-		if set -q _flag_bundled
-			# nothing here now
-		else
-			set build_options $build_options \
-				-define:RAYLIB_SHARED=true
-		end
-
-		mkdir -p $OUT_PATH/tools
-		odin_build_thing $tool_res
-		if test $status -eq 1
-			return 1
-		end
-
-		mkdir -p $OUT_PATH/release
-		set EXE_FULL_PATH $OUT_PATH/release/$EXE_NAME
-		odin_build_thing "release" build runner/release -out:$EXE_FULL_PATH $build_options $build_vars
+		mkdir -p $build_release_folder
+		set EXE_FULL_PATH $build_release_folder/$EXE_NAME
+		odin_build_thing $build_release
 		if test $status -eq 1
 			return 1
 		end
@@ -85,16 +51,9 @@ function main
 
 		set _flag_lib 1 # always building library if we are building the dev runner
 
-		mkdir -p $OUT_PATH/tools
-		run_thing $tool_res
-		if test $status -eq 1
-			return 1
-		end
-
-		mkdir -p $OUT_PATH/dev
-		set EXE_FULL_PATH $OUT_PATH/dev/$EXE_NAME
-		odin_build_thing "dev/runner" build runner/dev -out:$OUT_PATH/dev/game \
-			-debug $dev_only_options $build_options $build_vars
+		mkdir -p $build_dev_folder
+		set EXE_FULL_PATH $build_dev_folder/$EXE_NAME
+		odin_build_thing $build_dev
 		if test $status -eq 1
 			return 1
 		end
@@ -103,10 +62,8 @@ function main
 	###########################
 	if set -q _flag_lib && not set -q _flag_release
 
-		mkdir -p $OUT_PATH/dev
-
-		odin_build_thing "dev/library" build src -out:$OUT_PATH/dev/game.so \
-			-debug -build-mode:dll $dev_only_options $build_options $build_vars
+		mkdir -p $build_dev_folder
+		odin_build_thing $build_dev_lib
 		if test $status -eq 1
 			return 1
 		end

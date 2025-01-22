@@ -1,0 +1,8 @@
+# compiled folders
+bin
+src/res.odin
+
+# local environment files that should not be stored
+# in the repo
+.envrc
+commit-notes

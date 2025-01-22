@@ -2,6 +2,8 @@
 
 # edit the `builds.fish` to set the build options and paths
 
+##########################################################
+##########################################################
 # odin project build script
 function main
 	# checks that required things are available in path
@@ -36,6 +38,7 @@ function main
 	source $CURRENT_SCRIPT_PATH/scripts/builds.fish
 
 	############################
+	# builds the release
 	if set -q _flag_release
 
 		mkdir -p $build_release_folder
@@ -47,6 +50,8 @@ function main
 	
 	end
 	############################
+	# builds the dev runner executable
+	# will trigger the lib to be build too
 	if set -q _flag_dev && not set -q _flag_release
 
 		set _flag_lib 1 # always building library if we are building the dev runner
@@ -60,6 +65,7 @@ function main
 
 	end
 	###########################
+	# builds the dev library
 	if set -q _flag_lib && not set -q _flag_release
 
 		mkdir -p $build_dev_folder
@@ -70,10 +76,10 @@ function main
 	
 	end
 	###########################
-
-	# other things
+	# will run the game if the requested
 	if set -q _flag_run
 		if set -q _flag_dev
+			# runs the watcher that will rebuild the library and assets
 			fish $(dirname (status --current-filename))/dev-watcher.fish &
 		end
 		$EXE_FULL_PATH
@@ -82,6 +88,19 @@ function main
 	return 0
 end
 
+
+##########################################################
+##########################################################
+
+# BUILD SCRIPT HELPER FUNCTIONS
+# some functions to make things look prettier / make it easier
+# to read in the main function
+
+##########################################################
+##########################################################
+
+
+# parses the output from odin and prints it nicely
 function output_build_errors
 	# some options
 	set -l leader ">>> "
@@ -136,6 +155,7 @@ function output_build_errors
 
 end
 
+# makes spaces of the given size for columns / padding
 function spacer -a size glyph
 	if set -q glyph
 		set glyph " "
@@ -159,6 +179,9 @@ function check_exists -a func_name
 	return 0
 end
 
+# basic output, prefaces with the script name so the
+# output is clear what is happening when this script
+# calls outer scripts
 function out
 	set_color -o blue
 	echo -n "build.fish "
@@ -166,6 +189,7 @@ function out
 	echo $argv
 end
 
+# for the man / help
 function man_heading -a name
 
 	echo -n "  "
@@ -175,6 +199,7 @@ function man_heading -a name
 
 end
 
+# for the man / help
 function man_line -a option description
 	echo -n "    "
 
@@ -204,6 +229,9 @@ function man_line -a option description
 	set_color normal
 end
 
+# for running a script or other program
+# the first parameter is that name that is output to the user to explain
+# what is happenning
 function run_thing
 	out -n "running $argv[1]: "
 	set -l output ($argv[2..] 2>&1)
@@ -222,6 +250,9 @@ function run_thing
 
 end
 
+# for running `odin build`
+# the first parameter is that name that is output to the user to explain
+# what is happenning
 function odin_build_thing
 	out -n "building $argv[1]: "
 	set -l output (odin $argv[2..] 2>&1)

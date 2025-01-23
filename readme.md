@@ -11,7 +11,7 @@ caveats (things you should know if you want to use this)
 supported platforms:
 - desktop
 - _planned, not implemented_ mobile (android)
-- _planned, not implemented_ web
+- web
 
 ## features
 

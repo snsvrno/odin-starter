@@ -1,5 +1,6 @@
 # compiled folders
 bin
+recordings
 src/res.odin
 
 # local environment files that should not be stored

@@ -1,8 +1,7 @@
-package shared
+package snsvrno_log
 
 import "core:encoding/ansi"
 import "core:fmt"
-import "core:text/regex"
 
 Color :: enum {
 	None,
@@ -14,13 +13,10 @@ ColorMods :: enum {
 	Bold, Underline, Italic, UnderlineDouble,
 }
 
-ColorSectionCommands :: enum {
-	Push, Pop, Write,
-}
-
-ColorSection :: struct {
-	data:string,
-	command:ColorSectionCommands,
+when ODIN_OS == .Freestanding {
+	COLORIZE:bool=false
+} else {
+	COLORIZE:bool=true
 }
 
 colors_ansi_paint :: proc(text:string, fg:Color = .None, bg:Color = .None, mod:bit_set[ColorMods] = nil) -> string {
@@ -84,47 +80,10 @@ colors_ansi_add_code :: proc(existing:string, new_string:string) -> string {
 
 // takes a string with some kind of markdown, processes it and then colors it
 // using ansi color codes
+
 colors_to_ansi :: proc(text:string) -> string {
-	working_text := text
-
-	// parses the string and splits it up to command sections 
-	sections:[dynamic]ColorSection
-	defer delete(sections)
-	exp, err := regex.create("<([^<>]*)>", {.Global})
-	captures, success := regex.match(exp, working_text)
-
-	if !success {
-		append(&sections, ColorSection {
-			data = text,
-			command = .Write
-		})
-	}
-
-	for success {
-
-		if captures.pos[0][0] != 0 {
-			append(&sections, ColorSection {
-				data = working_text[:captures.pos[0][0]],
-				command = .Write
-			})
-		}
-
-		match_data := captures.groups[1]
-		working_text = working_text[captures.pos[0][1]:]
-
-		section:ColorSection
-		if match_data[0:1] == "/" {
-			section.data = match_data[1:]
-			section.command = .Pop
-		} else {
-			section.data = match_data
-			section.command = .Push
-		}
-		append(&sections, section)
-
-		captures, success = regex.match(exp, working_text)
-	}
-
+	sections:=color_parse_sections(text)
+	
 	// executes the command sections in order to make the requested text
 	rendered_text:string
 	style_stack:[dynamic]string
@@ -139,15 +98,18 @@ colors_to_ansi :: proc(text:string) -> string {
 			}
 			rendered_text = fmt.aprintf("{0}{1}", rendered_text, rend)
 		case .Push:
-			append(&style_stack, cmd.data)
+			if COLORIZE do append(&style_stack, cmd.data)
 		case .Pop:
-			last_style := pop(&style_stack)
-			if last_style != cmd.data {
-				fmt.printfln("error, was expecting closing for {0} but got {1}", last_style, cmd.data)
-				fmt.println("  {}", text)
+			if COLORIZE {
+				last_style := pop(&style_stack)
+				if last_style != cmd.data {
+					outf("error, was expecting closing for {0} but got {1}", last_style, cmd.data)
+					outf("  {}", text)
+				}
 			}
 		}
 	}
 
 	return rendered_text
+
 }

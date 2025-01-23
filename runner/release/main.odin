@@ -3,16 +3,16 @@ package main
 import game "../../src"
 import shared "../../shared"
 
-import "core:log"
 import "vendor:raylib"
 import "core:fmt"
+import "libs:log"
 
 main :: proc() {
  // connecting the logger
-	context.logger = shared.log_create_logger()
-	shared.LOGGER = context.logger
-	shared.log_init()
-	log.logf(.Info, "starting <game_name>{0}</game_name> (<game_version>{1}</game_version> built from <build_artifact>{2}</build_artifact> at <build_time>{3}</build_time>))",
+	context.logger = log.create_logger()
+	log.LOGGER = context.logger
+	log.init()
+	log.infof("starting <game_name>{0}</game_name> (<game_version>{1}</game_version> built from <build_artifact>{2}</build_artifact> at <build_time>{3}</build_time>)",
 		shared.GAME_NAME, shared.GAME_VERSION, shared.BUILD_ARTIFACT, shared.BUILD_TIME)
 
 	window_title := fmt.caprintf("{0} ({1})", shared.GAME_NAME, shared.GAME_VERSION)

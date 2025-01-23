@@ -1,4 +1,4 @@
-package shared
+package snsvrno_log
 
 styles_apply :: proc(style:string, text:string) -> string {
 	switch style {

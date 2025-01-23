@@ -6,19 +6,40 @@
 ##########################################################
 # odin project build script
 function main
+
 	# checks that required things are available in path
 	check_exists odin; if test $status -eq 1; return 1; end
 	check_exists jq; if test $status -eq 1; return 1; end
 
 	argparse \
-		'r/release' 'd/dev' 'l/lib' 'a/assets' \
+		'r/release' 'd/dev' 'l/lib' 'a/assets' 'w/web' \
 		'b/bundled' \
 		'x/run' \
 		'h/help' \
 		-- $argv
 
+	########################################################################
+	# configuring all the shared things
 	# used for the run arg, so we know what to run
+	set SRC_PATH src
+	set OUT_PATH bin
+	set EXE_NAME game
 	set EXE_FULL_PATH ""
+
+	set build_options \
+	-json-errors \
+	-collection:libs=libs
+
+	#things that must be set in order to get the hot reload working properly
+	set build_options_dev \
+		-define:RAYLIB_SHARED=true
+
+	# checks if we are 100% commited, or if there is some un tracked stuff
+	set git_status "*"; if test -z "$(git status --porcelain)"; set git_status ""; end
+	set build_vars \
+		-define:GAME_VERSION="$(git describe --abbrev=0)" \
+		-define:BUILD_ARTIFACT=\""$(git rev-parse --short HEAD)$git_status"\" \
+		-define:BUILD_TIME="$(date +%y-%j-%H%M)"
 
 	# man
 	if set -q _flag_help
@@ -33,17 +54,55 @@ function main
 		man_line "x/run" "run the project after building"
 	end
 
-	# loading the project specific configurations
-	set -l CURRENT_SCRIPT_PATH (cd (dirname (status -f)); and cd ..; and pwd)
-	source $CURRENT_SCRIPT_PATH/scripts/builds.fish
+	############################
+	# builds web
+	if set -q _flag_web
+		set -l folder $OUT_PATH/web
+
+		mkdir -p $folder
+
+		odin_build_thing "web/odin" build runner/web \
+			-out:$folder/game $build_options $build_vars \
+			-target:freestanding_wasm32 -build-mode:obj \
+			-define:RAYLIB_WASM_LIB=env.o \
+			-define:RAYGUI_WASM_LIB=env.o \
+			-vet -strict-style -o:speed
+
+		if test $status -eq 1
+			return 1
+		end
+
+		set -l em_files \
+			runner/web/main.c \
+			$folder/game.wasm.o \
+			$ODIN_PATH/vendor/raylib/wasm/libraylib.a \
+			$ODIN_PATH/vendor/raylib/wasm/libraygui.a
+
+		set -l em_flags \
+			-sUSE_GLFW=3 \
+			-sASSERTIONS \
+			--shell-file runner/web/index.html
+
+		build_thing "web/enscripten" \
+			emcc -o $folder/index.html $em_files $em_flags
+		
+		if test $status -eq 1
+			return 1
+		end
+
+	end
 
 	############################
 	# builds the release
 	if set -q _flag_release
+		set -l folder $OUT_PATH/release
 
-		mkdir -p $build_release_folder
-		set EXE_FULL_PATH $build_release_folder/$EXE_NAME
-		odin_build_thing $build_release
+		mkdir -p $folder
+		set EXE_FULL_PATH $folder/$EXE_NAME
+
+		odin_build_thing "release" build runner/release \
+			-out:$EXE_FULL_PATH $build_options $build_vars
+
 		if test $status -eq 1
 			return 1
 		end
@@ -53,12 +112,16 @@ function main
 	# builds the dev runner executable
 	# will trigger the lib to be build too
 	if set -q _flag_dev && not set -q _flag_release
-
 		set _flag_lib 1 # always building library if we are building the dev runner
+		set -l folder $OUT_PATH/dev
 
-		mkdir -p $build_dev_folder
-		set EXE_FULL_PATH $build_dev_folder/$EXE_NAME
-		odin_build_thing $build_dev
+		mkdir -p $folder
+		set EXE_FULL_PATH $folder/$EXE_NAME
+
+		odin_build_thing "dev/runner" build runner/dev \
+			-out:$EXE_FULL_PATH $build_options_dev $build_options \
+			$bulid_vars -debug
+
 		if test $status -eq 1
 			return 1
 		end
@@ -67,9 +130,14 @@ function main
 	###########################
 	# builds the dev library
 	if set -q _flag_lib && not set -q _flag_release
+		set -l folder $OUT_PATH/dev
 
-		mkdir -p $build_dev_folder
-		odin_build_thing $build_dev_lib
+		mkdir -p $folder
+
+		odin_build_thing "dev/library" build $SRC_PATH \
+			-out:$OUT_PATH/dev/game.so $build_options_dev $build_options \
+			$bulid_vars -debug -build-mode:dll
+
 		if test $status -eq 1
 			return 1
 		end
@@ -82,7 +150,14 @@ function main
 			# runs the watcher that will rebuild the library and assets
 			fish $(dirname (status --current-filename))/dev-watcher.fish &
 		end
-		$EXE_FULL_PATH
+
+		if set -q _flag_web
+			pushd bin/web
+			python -m http.server
+			popd
+		else
+			$EXE_FULL_PATH
+		end
 	end
 
 	return 0
@@ -234,6 +309,24 @@ end
 # what is happenning
 function run_thing
 	out -n "running $argv[1]: "
+	set -l output ($argv[2..] 2>&1)
+
+	if test $status -eq 0
+			set_color green; echo "done"; set_color normal
+		return 0
+	else
+		# will output the errors nicely since we have the json-errors switch
+		set_color red; echo "failed"; set_color normal
+		for line in $output
+			echo ">>> $line"
+		end
+		return 1
+	end
+
+end
+
+function build_thing
+	out -n "building $argv[1]: "
 	set -l output ($argv[2..] 2>&1)
 
 	if test $status -eq 0

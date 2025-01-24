@@ -9,6 +9,6 @@
 	"enable_snippets": true,
 	"profile": "default",
 	"profiles": [
-		{ "name": "default", "checker_path": ["src", "libs"]},
+		{ "name": "default", "checker_path": ["src", "libs", "runner"]},
 	]
 }

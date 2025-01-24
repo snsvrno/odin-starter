@@ -30,12 +30,38 @@ init :: proc() {
 	}
 }
 
-infof :: proc(template:string, params:..any) {
-	log.infof(template, ..params)
-}
+/////////////////////////////////////////////////
 
-logc :: proc(level:runtime.Logger_Level, ctx:string, text:string) {
-	log.logf(level, "<context> {0} </context> {1}", ctx, text)
+info :: proc(params:..any) { log.info(..params) }
+infof :: proc(template:string, params:..any) { log.infof(template, ..params) }
+cinfo :: proc(ctx:string, value:any) { logc(.Info, ctx, value) }
+cinfof :: proc(ctx:string, template:string, params:..any) { logcf(.Info, ctx, template, ..params) }
+
+warn :: proc(params:..any) { log.warn(..params) }
+warnf :: proc(template:string, params:..any) { log.warnf(template, ..params) }
+cwarn :: proc(ctx:string, value:any) { logc(.Warning, ctx, value) }
+cwarnf :: proc(ctx:string, template:string, params:..any) { logcf(.Warning, ctx, template, ..params) }
+
+debug :: proc(params:..any) { log.debug(..params) }
+debugf :: proc(template:string, params:..any) { log.debugf(template, ..params) }
+cdebug :: proc(ctx:string, value:any) { logc(.Debug, ctx, value) }
+cdebugf :: proc(ctx:string, template:string, params:..any) { logcf(.Debug, ctx, template, ..params) }
+
+error :: proc(params:..any) { log.error(..params) }
+errorf :: proc(template:string, params:..any) { log.errorf(template, ..params) }
+cerror :: proc(ctx:string, value:any) { logc(.Error, ctx, value) }
+cerrorf :: proc(ctx:string, template:string, params:..any) { logcf(.Error, ctx, template, ..params) }
+
+fatal :: proc(params:..any) { log.fatal(..params) }
+fatalf :: proc(template:string, params:..any) { log.fatalf(template, ..params) }
+cfatal :: proc(ctx:string, value:any) { logc(.Fatal, ctx, value) }
+cfatalf :: proc(ctx:string, template:string, params:..any) { logcf(.Fatal, ctx, template, ..params) }
+
+log :: proc(level:runtime.Logger_Level, params:..any) { log.log(level, ..params) }
+logf :: proc(level:runtime.Logger_Level, template:string, params:..any) { log.logf(level, template, ..params) }
+
+logc :: proc(level:runtime.Logger_Level, ctx:string, value:any) {
+	log.logf(level, "<context> {0} </context> {1}", ctx, value)
 }
 
 logcf :: proc(level:runtime.Logger_Level, ctx:string, text:string, args:..any) {

@@ -1,11 +1,12 @@
 package main
 
-import "core:log"
 import "core:os"
 import "core:time"
 import "core:fmt"
 
 import "vendor:raylib"
+
+import "libs:log"
 
 import shared "../../shared"
 
@@ -16,8 +17,8 @@ active_app:^App
 canvas:raylib.RenderTexture2D
 
 main :: proc() {
-	context.logger = shared.log_create_logger()
-	shared.LOGGER = context.logger
+	context.logger = log.create_logger()
+	log.LOGGER = context.logger
 	init()
 
 	// load all apps
@@ -93,7 +94,7 @@ hotreload :: proc() {
 }
 
 init :: proc() {
-	shared.log_init()
+	log.init()
 	log.logf(.Info, "starting <game_name>{0}</game_name> (<game_version>{1}</game_version> built from <build_artifact>{2}</build_artifact> at <build_time>{3}</build_time>))",
 		shared.GAME_NAME, shared.GAME_VERSION, shared.BUILD_ARTIFACT, shared.BUILD_TIME)
 

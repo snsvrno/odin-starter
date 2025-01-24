@@ -1,13 +1,12 @@
 package main
 
-import "core:dynlib"
-import "core:log"
-import "core:time"
 import "core:os"
+import "core:dynlib"
+import "core:time"
 import "core:fmt"
 import "core:path/filepath"
 
-import shared "../../shared"
+import "libs:log"
 
 APP_CTX::"runner/app-loader"
 APP_RELOAD::time.Duration(1_000_000_000)
@@ -56,7 +55,7 @@ app_load_all :: proc() -> (apps:[]App, ok:bool) {
 
 			// first copy
 			working_path, copy_ok := app_copy(file.fullpath, 0)
-			if !copy_ok { shared.logcf(.Warning, APP_CTX, "skipping {}", file.name); continue } 
+			if !copy_ok { log.cwarnf(APP_CTX, "skipping {}", file.name); continue } 
 
 			app:App
 			if symbols, ok := dynlib.initialize_symbols(&app, working_path, "app_"); ok {
@@ -64,24 +63,26 @@ app_load_all :: proc() -> (apps:[]App, ok:bool) {
 				// check that we didn't load something with the same name
 				for a in working {
 					if a.name() == app.name() {
-						shared.logcf(.Fatal, APP_CTX, "two apps have the same name - {}: <title>(1)</title> {} and <title>(2)</title> {}",
+						log.cfatalf(APP_CTX, "two apps have the same name - {}: <title>(1)</title> {} and <title>(2)</title> {}",
 							a.name(), filepath.base(a.source_path), file.name)
 					}
 				}
 
 				timestamp, time_err := os.last_write_time_by_name(file.fullpath)
 				if time_err != os.ERROR_NONE {
-					shared.logcf(.Warning, APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
-					shared.logcf(.Warning, APP_CTX, "skipping loading {}", file.name)
+					log.cwarnf(APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
+					log.cwarnf(APP_CTX, "skipping loading {}", file.name)
 					continue
 				}
 
-				shared.logcf(.Debug, APP_CTX, "loaded library <title>{}.0</title>", file.name)
+				log.cdebugf(APP_CTX, "loaded library <title>{}.0</title>", file.name)
 
 				app.version = 1
 				app.source_path = file.fullpath
 				app.timestamp = timestamp
 				append(&working, app)
+			} else {
+				log.cerrorf(APP_CTX, "could not load <title>{}</title> - {}", file.name, dynlib.last_error())
 			}
 		}
 	}
@@ -102,12 +103,12 @@ app_copy :: proc(path:string, ver:int) -> (new_path:string, ok:bool) {
 	})
 
 	if data, read_ok := os.read_entire_file_from_filename(path); read_ok {
-		if len(data) == 0 { shared.logc(.Error, APP_CTX, "app has 0 size?"); return; }
+		if len(data) == 0 { log.cerrorf(APP_CTX, "app has 0 size?"); return; }
 		if !os.write_entire_file(new_path, data) { 
-			shared.logcf(.Error, APP_CTX, "failed to copy library to <path>{0}</path>", filepath.base(new_path))
+			log.cerrorf(APP_CTX, "failed to copy library to <path>{0}</path>", filepath.base(new_path))
 			return
 		}
-	} else { shared.logc(.Error, APP_CTX, "could not read the library"); return }
+	} else { log.cerrorf(APP_CTX, "could not read the library"); return }
 
 	return new_path, true
 }
@@ -116,7 +117,7 @@ app_copy :: proc(path:string, ver:int) -> (new_path:string, ok:bool) {
 // these are made with `app_copy`
 app_cleanup_versions :: proc(apps:[]App) {
 	for app in apps {
-		shared.logcf(.Debug, APP_CTX, "cleaning up library versions of <title>{}</title>", filepath.base(app.source_path))
+		log.cdebugf(APP_CTX, "cleaning up library versions of <title>{}</title>", filepath.base(app.source_path))
 		for i := 0; i <= app.version; i += 1 {
 			new_library_path := fmt.aprintf("{0}.{1}", app.source_path, i)
 			if os.exists(new_library_path) do os.remove(new_library_path)
@@ -128,7 +129,7 @@ app_cleanup_versions :: proc(apps:[]App) {
 app_has_changed :: proc(app:^App) -> bool {
 	timestamp, time_err := os.last_write_time_by_name(app.source_path)
 	if time_err != os.ERROR_NONE {
-		shared.logcf(.Warning, APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
+		log.cwarnf(APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
 		return false
 	}
 	if (timestamp == app.timestamp) { return false }
@@ -145,15 +146,15 @@ app_reload :: proc(app:^App) -> (needs_reload:bool, ok:bool) {
 	old_data_size := app.data_size()
 
 	if symbols, init_ok := dynlib.initialize_symbols(app, new_path, "app_"); !init_ok { 
-		shared.logcf(.Error, APP_CTX, "failed to reload {}", filepath.base(new_path)); 
+		log.cerrorf(APP_CTX, "failed to reload {}", filepath.base(new_path)); 
 		return 
 	}
 
-	shared.logcf(.Debug, APP_CTX, "loaded library <title>{}</title>", filepath.base(new_path))
+	log.cdebugf(APP_CTX, "loaded library <title>{}</title>", filepath.base(new_path))
 
 	reload:=false
 	if old_data_size != app.data_size() {
-		shared.logc(.Debug, APP_CTX, "data has changed size, will need a reload")
+		log.cdebug(APP_CTX, "data has changed size, will need a reload")
 		reload = true
 		free(old_data)
 	} else {
@@ -161,8 +162,8 @@ app_reload :: proc(app:^App) -> (needs_reload:bool, ok:bool) {
 	}
 
 	if timestamp, time_err := os.last_write_time_by_name(app.source_path); time_err != os.ERROR_NONE {
-		shared.logcf(.Warning, APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
-		shared.logcf(.Warning, APP_CTX, "skipping loading {}", filepath.base(new_path))
+		log.cwarnf(APP_CTX, "unable to get library time: error code <number>{0}</number>", time_err)
+		log.cwarnf(APP_CTX, "skipping loading {}", filepath.base(new_path))
 		return
 	} else do app.timestamp = timestamp
 
